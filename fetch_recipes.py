@@ -14,7 +14,7 @@ import time
 
 def search_entire_category(category_url, save_filename):
     '''writes all recipe links for a given category to pickle list file'''
-    MAX_NUM_PAGES = 2  # TODO: find a way to set that automatically
+    MAX_NUM_PAGES = 500  # TODO: find a way to set that automatically
     recipe_urls = []
 
     # browse over all the search pages for a given category and get their recipes
@@ -94,7 +94,7 @@ def generate_db_from_recipe_urls(recipe_urls, db_path):
     options = webdriver.ChromeOptions()
     options.add_argument('headless')
     options.add_argument("--window-size=1920,1080")
-    driver = webdriver.Chrome('./chromedriver.exe', options=options)
+    driver = webdriver.Chrome('./chromedriver', options=options)
 
     with open('recipe_reviews.csv', 'w') as r, open('recipe_features.csv', 'w') as f:
         review_writer = csv.writer(r, delimiter='|', quotechar='"', quoting=csv.QUOTE_MINIMAL)
@@ -134,7 +134,9 @@ def main():
     pickle_filename = 'allrecipe_urls.pkl'
     db_path = 'TODO'
 
-    recipe_urls = search_entire_category(category_url, pickle_filename)
+   # recipe_urls = search_entire_category(category_url, pickle_filename)
+    file = open('allrecipe_urls.pkl', 'rb')
+    recipe_urls = pickle.load(file)
     print('RECIPE URLS DONE')
     generate_db_from_recipe_urls(recipe_urls, db_path)
 
