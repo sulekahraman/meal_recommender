@@ -19,9 +19,12 @@ from reco_utils.common import constants
 COOCCUR = "cooccurrence"
 JACCARD = "jaccard"
 LIFT = "lift"
+CUSTOM = "custom"
 
 logger = logging.getLogger()
 
+def custom_jaccard(a, b):
+    return len(set(a).intersection(set(b)))/len(set(a).union(set(b)))
 
 class SARSingleNode:
     """Simple Algorithm for Recommendations (SAR) implementation
@@ -34,6 +37,7 @@ class SARSingleNode:
 
     def __init__(
         self,
+        recipes=None,
         col_user=constants.DEFAULT_USER_COL,
         col_item=constants.DEFAULT_ITEM_COL,
         col_rating=constants.DEFAULT_RATING_COL,
@@ -54,22 +58,23 @@ class SARSingleNode:
             col_rating (str): rating column name
             col_timestamp (str): timestamp column name
             col_prediction (str): prediction column name
-            similarity_type (str): ['cooccurrence', 'jaccard', 'lift'] option for computing item-item similarity
+            similarity_type (str): ['cooccurrence', 'jaccard', 'lift', 'custom'] option for computing item-item similarity
             time_decay_coefficient (float): number of days till ratings are decayed by 1/2
             time_now (int | None): current time for time decay calculation
             timedecay_formula (bool): flag to apply time decay
             threshold (int): item-item co-occurrences below this threshold will be removed
             normalize (bool): option for normalizing predictions to scale of original ratings
         """
+        self.recipes = recipes
         self.col_rating = col_rating
         self.col_item = col_item
         self.col_user = col_user
         self.col_timestamp = col_timestamp
         self.col_prediction = col_prediction
 
-        if similarity_type not in [COOCCUR, JACCARD, LIFT]:
+        if similarity_type not in [COOCCUR, JACCARD, LIFT, CUSTOM]:
             raise ValueError(
-                'Similarity type must be one of ["cooccurrence" | "jaccard" | "lift"]'
+                'Similarity type must be one of ["cooccurrence" | "jaccard" | "lift" | "custom"]'
             )
         self.similarity_type = similarity_type
         self.time_decay_half_life = (
@@ -175,8 +180,23 @@ class SARSingleNode:
         item_cooccurrence = item_cooccurrence.multiply(
             item_cooccurrence >= self.threshold
         )
-
+            
         return item_cooccurrence.astype(df[self.col_rating].dtype)
+    
+    def custom_item_similarity(self,df):
+        if self.similarity_type == CUSTOM:
+            similarities = np.empty((self.n_items,self.n_items),dtype=np.float16)
+            for i in range(0, self.n_items):
+                for j in range(i, self.n_items):
+                    item_i_id = self.index2item[i]
+                    item_j_id = self.index2item[j]
+                    item_i = self.recipes[self.recipes.recipe_id == item_i_id]
+                    item_j = self.recipes[self.recipes.recipe_id == item_j_id]
+                    jac_ingredients =  custom_jaccard(item_i.loc[0].ingredients.split("+"),item_j.loc[0].ingredients.split("+"))
+                    jac_path = custom_jaccard(item_i.loc[0].breadcrumbs.split("+"),item_j.loc[0].breadcrumbs.split("+"))
+                    similarities[i,j] = (jac_ingredients * 3 + jac_path) / 4 
+                    similarities[j,i] = (jac_ingredients * 3 + jac_path) / 4
+            return similarities.astype(df[self.col_rating].dtype)
 
     def set_index(self, df):
         """Generate continuous indices for users and items to reduce memory usage.
@@ -206,6 +226,8 @@ class SARSingleNode:
         """
 
         # generate continuous indices if this hasn't been done
+        logger.info("Testing logger")
+        
         if self.index2item is None:
             self.set_index(df)
 
@@ -214,10 +236,12 @@ class SARSingleNode:
             raise TypeError("Rating column data type must be numeric")
 
         # copy the DataFrame to avoid modification of the input
-        select_columns = [self.col_user, self.col_item, self.col_rating]
-        if self.time_decay_flag:
-            select_columns += [self.col_timestamp]
-        temp_df = df[select_columns].copy()
+#         select_columns = [self.col_user, self.col_item, self.col_rating]
+#         if self.time_decay_flag:
+#             select_columns += [self.col_timestamp]
+#         temp_df = df[select_columns].copy()
+        temp_df = df.copy()
+    
 
         if self.time_decay_flag:
             logger.info("Calculating time-decayed affinities")
@@ -248,6 +272,9 @@ class SARSingleNode:
         # calculate item co-occurrence
         logger.info("Calculating item co-occurrence")
         item_cooccurrence = self.compute_coocurrence_matrix(df=temp_df)
+        
+        logger.info("Calculating custom co-occurrence")
+        custom_cooccur = self.custom_item_similarity(df=temp_df)
 
         # free up some space
         del temp_df
@@ -268,6 +295,9 @@ class SARSingleNode:
             self.item_similarity = lift(item_cooccurrence).astype(
                 df[self.col_rating].dtype
             )
+        elif self.similarity_type is CUSTOM:
+            logger.info("Using custom similarity")
+            self.item_similarity = item_cooccurrence + custom_cooccur
         else:
             raise ValueError("Unknown similarity type: {}".format(self.similarity_type))
 
