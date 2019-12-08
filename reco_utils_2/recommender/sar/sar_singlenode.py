@@ -205,7 +205,7 @@ class SARSingleNode:
             df (pd.DataFrame): User item rating dataframe
             features (pd.DataFrame): item feature dataframe
             col_itemid (string): name of the item id column of the feature dataframe
-            col_weights (dictionary): mapping feature column names (column type has to be list) to their weight in the similarity metric
+            col_weights (dictionary): mapping feature column names (column type has to be list) to their (weight, similarity_function) in the similarity metric
                                     required to contain key 'ratings' with the weight of the similarity based on user ratings
         """
 
@@ -277,7 +277,8 @@ class SARSingleNode:
             for col_feature in col_weights:
                 if col_feature == 'ratings':
                     continue
-                self.item_similarity += col_weights[col_feature] * self.jaccard_matrix(features, col_itemid, col_feature) 
+                weight, similarity_function = col_weights[col_feature]
+                self.item_similarity += weight * self.make_sim_matrix(features, col_itemid, col_feature, similarity_function) 
 
         else:
             raise ValueError("Unknown similarity type: {}".format(self.similarity_type))
@@ -493,14 +494,14 @@ class SARSingleNode:
         return df
 
 
-    def jaccard_matrix(self, df, col_id, col_sim):
+    def make_sim_matrix(self, df, col_id, col_sim, f):
         num_items = len(df)
         sim_matrix = np.empty((num_items, num_items), dtype=np.float16)
         for i in range(0, num_items):
             for j in range(0, num_items): # case j > i redundant, could stop earlier
                 index_i = self.item2index[df.loc[i][col_id]]
                 index_j = self.item2index[df.loc[j][col_id]]
-                sim_matrix[index_i,index_j] =  jaccard_simple(df.loc[i][col_sim], df.loc[j][col_sim])
+                sim_matrix[index_i,index_j] =  f(df.loc[i][col_sim], df.loc[j][col_sim])
         return sim_matrix
 
 def jaccard_simple(a, b):
