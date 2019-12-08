@@ -186,10 +186,13 @@ class SARSingleNode:
         """
 
         # generate a map of continuous index values to items
+        print('items in df', df[self.col_item].size)
         self.index2item = dict(enumerate(df[self.col_item].unique()))
+        print('index to item len', len(self.index2item))
 
         # invert the mapping from above
         self.item2index = {v: k for k, v in self.index2item.items()}
+        print('item to index len', len(self.item2index))
 
         # create mapping of users to continuous indices
         self.user2index = {x[1]: x[0] for x in enumerate(df[self.col_user].unique())}
