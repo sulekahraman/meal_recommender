@@ -7,7 +7,8 @@ import pandas as pd
 import logging
 import pickle
 from scipy import sparse
-
+import os 
+#print(os.getcwd())
 from reco_utils.common.python_utils import (
     jaccard,
     lift,
@@ -20,7 +21,7 @@ from reco_utils.common import constants
 COOCCUR = "cooccurrence"
 JACCARD = "jaccard"
 LIFT = "lift"
-
+DATA_DIR = '../data/'
 logger = logging.getLogger()
 
 
@@ -203,33 +204,32 @@ class SARSingleNode:
         self.n_users = len(self.user2index)
         self.n_items = len(self.index2item)
 
-    def fit(self, df, features, col_itemid, col_weights, load=False):
+    def fit(self, df, features, col_itemid, col_weights, demo=False):
         """Main fit method for SAR.
 
         Args:
             df (pd.DataFrame): User item rating dataframe
             features (pd.DataFrame): item feature dataframe
             col_itemid (string): name of the item id column of the feature dataframe
-            col_weights (dictionary): mapping feature column names (column type has to be list) to their (weight, similarity_function) in the similarity metric
-                                    required to contain key 'ratings' with the weight of the similarity based on user ratings
+            col_weights (dictionary): mapping feature column names to their (weight, similarity_function) 
+            in the similarity metric required to contain key 'ratings' with the weight of the similarity based on user ratings
+            col_weights of features that are not 'ratings' should sum to 1 
         """
-
-
-
+        num_items = len(features)
+        load = False
+        experiment_path = DATA_DIR + 'experiment/'
+        demo_path = DATA_DIR + 'demo/'
+        path = experiment_path
+        if os.path.exists(experiment_path+'item_feature_similarity_{}.npy'.format(num_items)):
+            load = True
+            
+        if demo:
+            load = True
+            path = demo_path
 
         if load:
-            with open('saved/index2item.obj', 'rb') as file_index2item:
-                self.index2item = pickle.load(file_index2item)
-
-            with open('saved/item2index.obj', 'rb') as file_item2index:
-                self.item2index = pickle.load(file_item2index)
-            # create mapping of users to continuous indices
-            self.user2index = {x[1]: x[0] for x in enumerate(df[self.col_user].unique())}
-
-            # set values for the total count of users and items
-            self.n_users = len(self.user2index)
-            self.n_items = len(self.index2item)
-
+            self.load_file(path, num_items, df) #set features_sim_matrix, index2item, item2index
+        
         elif self.index2item is None:
             # generate continuous indices if this hasn't been done
             self.set_index(df)
@@ -269,13 +269,7 @@ class SARSingleNode:
         # affinity matrix
         logger.info("Building user affinity sparse matrix")
         self.user_affinity = self.compute_affinity_matrix(df=temp_df, rating_col=self.col_rating)
-
-        # load model from files 
-        if load:
-            logger.info("loading item similarity matrix")
-            self.item_similarity = np.load('saved/item_similarity.npy')
-            return
-
+        
         # calculate item co-occurrence
         logger.info("Calculating item co-occurrence")
         item_cooccurrence = self.compute_coocurrence_matrix(df=temp_df)
@@ -301,14 +295,11 @@ class SARSingleNode:
             )
         elif self.similarity_type is "custom":
             self.item_similarity = col_weights['ratings'] * jaccard(item_cooccurrence).astype(df[self.col_rating].dtype)
-            for col_feature in col_weights:
-                if col_feature == 'ratings':
-                    continue
-                weight, similarity_function = col_weights[col_feature]
-                self.item_similarity += weight * self.make_sim_matrix(features, col_itemid, col_feature, similarity_function) 
-
-
-
+            if not load:
+                self.features_sim_matrix = self.compute_feature_sim_matrix(col_weights, features, col_itemid)
+                self.save_to_file(path)
+            #!!! assuming self.features_sim_matrix has scale 1 (i.e. col_weights[features] all sum to 1)
+            self.item_similarity += (1-col_weights['ratings'])*self.features_sim_matrix   
         else:
             raise ValueError("Unknown similarity type: {}".format(self.similarity_type))
 
@@ -316,14 +307,50 @@ class SARSingleNode:
         del item_cooccurrence
 
         logger.info("Done training")
+    
+    def compute_feature_sim_matrix(self, col_weights, features, col_itemid): 
+        num_items = len(features)
+        features_sim_matrix = np.zeros((num_items, num_items))
+        for col_feature in col_weights:
+            if col_feature == 'ratings':
+               continue
+            weight, similarity_function = col_weights[col_feature]
+            features_sim_matrix += weight * self.make_sim_matrix(features, col_itemid, col_feature, similarity_function) 
+        return features_sim_matrix
 
-    def save_to_file(self):
-        np.save('saved/item_similarity', self.item_similarity)
 
-        with open('saved/item2index.obj', 'wb') as filehandler:
+    def make_sim_matrix(self, df_features, col_id, col_sim, f, load=True):
+        num_items = len(df_features)
+        sim_matrix = np.empty((num_items, num_items), dtype=np.float16)
+        for i in range(0, num_items):
+            for j in range(0, num_items): # case j > i redundant, could stop earlier
+                index_i = self.item2index[df_features.loc[i][col_id]]
+                index_j = self.item2index[df_features.loc[j][col_id]]
+                sim_matrix[index_i,index_j] =  f(df_features.loc[i][col_sim], df_features.loc[j][col_sim])
+        return sim_matrix
+
+    def load_file(self, path, num_items, df_ratings):
+        self.features_sim_matrix = np.load(path+'item_feature_similarity_{}.npy'.format(num_items))
+        with open(path+'index2item_{}.obj'.format(num_items), 'rb') as file_index2item:
+            self.index2item = pickle.load(file_index2item)
+
+        with open(path+'item2index_{}.obj'.format(num_items), 'rb') as file_item2index:
+            self.item2index = pickle.load(file_item2index)
+           # create mapping of users to continuous indices
+            self.user2index = {x[1]: x[0] for x in enumerate(df_ratings[self.col_user].unique())}
+
+           # set values for the total count of users and items
+            self.n_users = self.n_items = len(self.user2index)
+            self.n_items = len(self.index2item)
+       
+        
+    def save_to_file(self, path):
+        np.save(path+'item_feature_similarity_{}.npy'.format(self.n_items), self.features_sim_matrix)
+
+        with open(path+'item2index_{}.obj'.format(self.n_items), 'wb') as filehandler:
             pickle.dump(self.item2index, filehandler)
 
-        with open('saved/index2item.obj', 'wb')  as filehandler:
+        with open(path+'index2item_{}.obj'.format(self.n_items), 'wb')  as filehandler:
             pickle.dump(self.index2item, filehandler)
 
     def score(self, test, remove_seen=False, normalize=False):
@@ -532,18 +559,8 @@ class SARSingleNode:
         return df
 
 
-    def make_sim_matrix(self, df, col_id, col_sim, f):
-        num_items = len(df)
-        sim_matrix = np.empty((num_items, num_items), dtype=np.float16)
-        for i in range(0, num_items):
-            for j in range(0, num_items): # case j > i redundant, could stop earlier
-                index_i = self.item2index[df.loc[i][col_id]]
-                index_j = self.item2index[df.loc[j][col_id]]
-                sim_matrix[index_i,index_j] =  f(df.loc[i][col_sim], df.loc[j][col_sim])
-        return sim_matrix
-
-def jaccard_simple(a, b):
-    return len(set(a).intersection(set(b)))/len(set(a).union(set(b)))
+#def jaccard_simple(a, b):
+#    return len(set(a).intersection(set(b)))/len(set(a).union(set(b)))
 
 
 
