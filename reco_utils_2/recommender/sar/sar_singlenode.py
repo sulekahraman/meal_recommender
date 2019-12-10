@@ -5,6 +5,7 @@
 import numpy as np
 import pandas as pd
 import logging
+import pickle
 from scipy import sparse
 
 from reco_utils.common.python_utils import (
@@ -61,6 +62,7 @@ class SARSingleNode:
             threshold (int): item-item co-occurrences below this threshold will be removed
             normalize (bool): option for normalizing predictions to scale of original ratings
         """
+
         self.col_rating = col_rating
         self.col_item = col_item
         self.col_user = col_user
@@ -201,7 +203,7 @@ class SARSingleNode:
         self.n_users = len(self.user2index)
         self.n_items = len(self.index2item)
 
-    def fit(self, df, features, col_itemid, col_weights):
+    def fit(self, df, features, col_itemid, col_weights, load=False):
         """Main fit method for SAR.
 
         Args:
@@ -212,8 +214,24 @@ class SARSingleNode:
                                     required to contain key 'ratings' with the weight of the similarity based on user ratings
         """
 
-        # generate continuous indices if this hasn't been done
-        if self.index2item is None:
+
+
+
+        if load:
+            with open('saved/index2item.obj', 'rb') as file_index2item:
+                self.index2item = pickle.load(file_index2item)
+
+            with open('saved/item2index.obj', 'rb') as file_item2index:
+                self.item2index = pickle.load(file_item2index)
+            # create mapping of users to continuous indices
+            self.user2index = {x[1]: x[0] for x in enumerate(df[self.col_user].unique())}
+
+            # set values for the total count of users and items
+            self.n_users = len(self.user2index)
+            self.n_items = len(self.index2item)
+
+        elif self.index2item is None:
+            # generate continuous indices if this hasn't been done
             self.set_index(df)
 
         logger.info("Collecting user affinity matrix")
@@ -252,6 +270,12 @@ class SARSingleNode:
         logger.info("Building user affinity sparse matrix")
         self.user_affinity = self.compute_affinity_matrix(df=temp_df, rating_col=self.col_rating)
 
+        # load model from files 
+        if load:
+            logger.info("loading item similarity matrix")
+            self.item_similarity = np.load('saved/item_similarity.npy')
+            return
+
         # calculate item co-occurrence
         logger.info("Calculating item co-occurrence")
         item_cooccurrence = self.compute_coocurrence_matrix(df=temp_df)
@@ -283,6 +307,8 @@ class SARSingleNode:
                 weight, similarity_function = col_weights[col_feature]
                 self.item_similarity += weight * self.make_sim_matrix(features, col_itemid, col_feature, similarity_function) 
 
+
+
         else:
             raise ValueError("Unknown similarity type: {}".format(self.similarity_type))
 
@@ -290,6 +316,15 @@ class SARSingleNode:
         del item_cooccurrence
 
         logger.info("Done training")
+
+    def save_to_file(self):
+        np.save('saved/item_similarity', self.item_similarity)
+
+        with open('saved/item2index.obj', 'wb') as filehandler:
+            pickle.dump(self.item2index, filehandler)
+
+        with open('saved/index2item.obj', 'wb')  as filehandler:
+            pickle.dump(self.index2item, filehandler)
 
     def score(self, test, remove_seen=False, normalize=False):
         """Score all items for test users.
@@ -509,5 +544,7 @@ class SARSingleNode:
 
 def jaccard_simple(a, b):
     return len(set(a).intersection(set(b)))/len(set(a).union(set(b)))
+
+
 
 
