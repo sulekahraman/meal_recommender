@@ -15,9 +15,9 @@ export default class Module extends React.Component {
       let newState = {...self.state}
       newState.username = data.username
       if (i < 3){
-        newState.likes[i] = {img:data.img_link,recipe_id:data.recipe_id}
+        newState.likes[i] = {img:data.image,recipe_id:data.recipe_id}
       } else {
-        newState.dislikes[i-3] = {img:data.img_link,recipe_id:data.recipe_id}
+        newState.dislikes[i-3] = {img:data.image,recipe_id:data.recipe_id}
       }
       self.setState(newState)
       i +=  1
