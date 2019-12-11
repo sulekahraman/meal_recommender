@@ -15,9 +15,9 @@ export default class Module extends React.Component {
       let newState = {...self.state}
       newState.username = data.username
       if (i < 3){
-        newState.likes[i] = {img:data.img_link,recipe_id:data.recipe_id}
+        newState.likes[i] = {img:data.image,recipe_id:data.recipe_id}
       } else {
-        newState.dislikes[i-3] = {img:data.img_link,recipe_id:data.recipe_id}
+        newState.dislikes[i-3] = {img:data.image,recipe_id:data.recipe_id}
       }
       self.setState(newState)
       i +=  1
@@ -27,55 +27,55 @@ export default class Module extends React.Component {
 
   render() {
 
-  console.log(this.state)
-  return ( 
-    <div style={{textAlign:"center"}}>
+    return ( 
       <div style={{textAlign:"center"}}>
-        <h2>Recipe Recommendations For {this.state.username}</h2>
-        <p>Top 3 Recommended Recipes:</p>
+        <div style={{textAlign:"center"}}>
+          <h1>Recipe Recommendations for: <p style={{color:"blue"}}>{this.state.username}</p></h1>
+          <h2>Top 3 Recommended Recipes:</h2>
+        </div>
+
+    <div class='row' >
+      <div class='column'>
+        <img src={this.state.likes[0].img} style={{"width":"100%"}} />
+        <p>{this.state.likes[0].recipe_id}</p>
       </div>
-
-  <div class='row'>
-    <div class='column'>
-      <img src={this.state.likes[0].img} style={{"width":"100%"}} />
-      <p>{this.state.likes[0].recipe_id}</p>
+      <div class='column'>
+        <img src={this.state.likes[1].img} style={{"width":"100%"}} />
+        <p>{this.state.likes[1].recipe_id}</p>
+      </div>
+      <div class='column'>
+        <img src={this.state.likes[2].img} style={{"width":"100%"}} />
+        <p>{this.state.likes[2].recipe_id}</p>
+      </div>
     </div>
-    <div class='column'>
-      <img src={this.state.likes[1].img} style={{"width":"100%"}} />
-      <p>{this.state.likes[1].recipe_id}</p>
-    </div>
-    <div class='column'>
-      <img src={this.state.likes[2].img} style={{"width":"100%"}} />
-      <p>{this.state.likes[2].recipe_id}</p>
-    </div>
-  </div>
 
 
-  <div style={{textAlign:"center", marginTop: "100px"}}>
-    <p>Bottom 3 Recommended Recipes:</p>
-  </div>
+    <div style={{textAlign:"center", marginTop: "100px"}}>
+      <h2>Bottom 3 Recommended Recipes:</h2>
+    </div>
 
-  <div class='row'>
-    <div class='column'>
-      <img src={this.state.dislikes[0].img} style={{"width":"100%"}} />
-      <p>{this.state.dislikes[0].recipe_id}</p>
+    <div class='row'>
+      <div class='column'>
+        <img src={this.state.dislikes[0].img} style={{"width":"100%"}} />
+        <p>{this.state.dislikes[0].recipe_id}</p>
+      </div>
+      <div class='column'>
+        <img src={this.state.dislikes[1].img} style={{"width":"100%"}} />
+        <p>{this.state.dislikes[1].recipe_id}</p>
+      </div>
+      <div class='column'>
+        <img src={this.state.dislikes[2].img} style={{"width":"100%"}} />
+        <p>{this.state.dislikes[2].recipe_id}</p>
+      </div>
     </div>
-    <div class='column'>
-      <img src={this.state.dislikes[1].img} style={{"width":"100%"}} />
-      <p>{this.state.dislikes[1].recipe_id}</p>
-    </div>
-    <div class='column'>
-      <img src={this.state.dislikes[2].img} style={{"width":"100%"}} />
-      <p>{this.state.dislikes[2].recipe_id}</p>
-    </div>
-  </div>
 
-  <div class="container">
-    <span onclick="this.parentElement.style.display='none'" class="closebtn">&times;</span>
-    <img id="expandedImg" style={{"width":"100%"}}/>
-    <div id="imgtext"></div>
-  </div>
-  </div>
-    );
-}}
+    <div class="container">
+      <span onclick="this.parentElement.style.display='none'" class="closebtn">&times;</span>
+      <img id="expandedImg" style={{"width":"100%"}}/>
+      <div id="imgtext"></div>
+    </div>
+    </div>
+      );
+  }
+}
 
