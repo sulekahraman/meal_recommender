@@ -33,6 +33,7 @@ def run_demo(new_ratings_path):
     #print(best_k)
     print("Top {} Recommended Recipes for {}: ".format(k,username))
     with open('../data/demo/most_recent_reco.csv','w') as f: 
+        f.write('username,recipe_id,image\n')
         for i, recipe in enumerate(best_k['recipe_id']):
             recipe_img = features.loc[(features['recipe_id'] == recipe), 'big_image'].item()
             f.write(username + ',' + recipe + ',' + recipe_img)
