@@ -7,22 +7,30 @@ git clone https://github.com/sulekahraman/meal_recommender.git
 pip install -r requirements.txt 
 ```
 
-## System Architecture
-### Augment Simple Algorithm for Recommendation (SAR)
+## Running Code
+All of the code for our system can be found in (either directly or linked within) the [model/sar_deep_dive.ipynb](/model/sar_deep_dive.ipynb). To run, just navegate to the git repo directory and run:
+```
+jupyter notebook
+```
+There, you can open the jupyter notebook [sar_deep_dive.ipynb](/model/sar_deep_dive.ipynb) and go through the cells which have infomation about what each cell does/computes. You will find links to other notebooks, specifically ones that explain how we generate our synthetic users, how we create small/usable recipes databases, and how we calculate the similarity and affinity matrices. Here is also where you will find our evaluation of our system
+
+
+## System Architecture 
+### Augmented Simple Algorithm for Recommendation (SAR) Diagram
 diagrams/sar_diag.png
 
-### End-to-end system
+### End-to-end System Diagram
 diagrams/sys_diag.png
 
 
 ## Data
-### Recipes Dataset
+### Recipes Datasets
 * Schema: Provides recipe features (title, unique ID, cuisine, and ingredients)
 * Generation: Implemented a Python web scraper to extract over 140 recipes from allrecipes.com’s ’Main Dish’ category. Code can found in the **data_collection** folder.
 * Standardization: Cleaned recipes using a custom regex script to remove common ingredients (e.g. salt) and distinguish measurement amounts from ingredients. Code can be found in the **data_processing** folder.
 * Use: To generate recipe-recipe similarity matrix for our recommendation engine.
 
-### Reviews Dataset
+### Reviews Datasets
 * Schema: Holds user rating information (username, rating, recipe ID).
 * Generation: 
   * Method 1: Scraped up to 150 reviews per recipe from allrecipes.com
